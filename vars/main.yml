@@ -1,0 +1,10 @@
+# Variables for the playbook
+---
+opensupports_ip: 192.168.127.156
+opensupports_target_user: root
+opensupports_user: root
+opensupports_admin_pass: uiopuiop
+mysql_root_user: root
+mysql_current_password: ''
+mysql_password: SuperHardP@ssword123
+opensupports_db: support

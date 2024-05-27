@@ -1,0 +1,260 @@
+- name: Gather facts about the system
+  ansible.builtin.setup:
+
+- name: Show the distribution version
+  debug:
+    msg: "The distribution version is {{ ansible_distribution }} {{ ansible_distribution_version }}"
+
+- name: Ensure the system is up to date
+  ansible.builtin.yum:
+    name: "*"
+    state: latest
+
+- name: Install Python3
+  ansible.builtin.yum:
+    name: python3
+    state: present
+
+- name: Install PyMySQL for Python3
+  ansible.builtin.yum:
+    name: python3-PyMySQL
+    state: present
+
+- name: Install EPEL repository
+  ansible.builtin.yum:
+    name: epel-release
+    state: present
+
+- name: Import Remi2021 GPG key.
+  rpm_key:
+    key: https://rpms.remirepo.net/RPM-GPG-KEY-remi2021
+    state: present
+
+- name: Install Remi repository
+  ansible.builtin.yum:
+    name: https://rpms.remirepo.net/enterprise/remi-release-9.rpm
+    state: present
+
+- name: Enable PHP 7.4 module
+  ansible.builtin.command:
+    cmd: dnf module enable php:remi-7.4 -y
+
+- name: Remove any existing PHP versions
+  ansible.builtin.yum:
+    name: "php*"
+    state: absent
+
+- name: Install PHP 7.4 and required extensions
+  ansible.builtin.yum:
+    name:
+      - php
+      - php-cli
+      - php-fpm
+      - php-json
+      - php-mysqlnd
+      - php-pdo
+      - php-xml
+      - php-mbstring
+    state: present
+
+- name: Add MySQL Yum repository for Rocky 9
+  ansible.builtin.yum_repository:
+    name: mysql80-community
+    description: MySQL 8.0 Community Server
+    baseurl: http://repo.mysql.com/yum/mysql-8.0-community/el/9/$basearch/
+    gpgcheck: yes
+    gpgkey: https://repo.mysql.com/RPM-GPG-KEY-mysql-2023
+    enabled: yes
+
+- name: Import MySQL GPG key
+  ansible.builtin.rpm_key:
+    state: present
+    key: https://repo.mysql.com/RPM-GPG-KEY-mysql-2023
+
+- name: Install MySQL server
+  ansible.builtin.yum:
+    name:
+      - mysql
+      - mysql-server
+    state: present
+
+- name: Start and enable MySQL service
+  ansible.builtin.service:
+    name: mysqld
+    state: started
+    enabled: yes
+
+- name: Add skip-grant-tables to MySQL config
+  ansible.builtin.blockinfile:
+    path: /etc/my.cnf
+    block: |
+      skip-grant-tables
+
+- name: Restart MySQL service to apply skip-grant-tables
+  ansible.builtin.service:
+    name: mysqld
+    state: restarted
+
+- name: Flush privileges and set MySQL root password
+  ansible.builtin.command:
+    cmd: "mysql -u root -e \"FLUSH PRIVILEGES; ALTER USER 'root'@'localhost' IDENTIFIED BY '{{ mysql_password }}';\""
+
+- name: Remove skip-grant-tables from MySQL config
+  ansible.builtin.replace:
+    path: /etc/my.cnf
+    regexp: '^\s*skip-grant-tables\s*$'
+    replace: ''
+    backup: yes
+
+- name: Restart MySQL service to remove skip-grant-tables
+  ansible.builtin.service:
+    name: mysqld
+    state: restarted
+
+- name: Remove anonymous MySQL users
+  community.mysql.mysql_user:
+    name: ''
+    host_all: yes
+    state: absent
+    login_user: root
+    login_password: "{{ mysql_password }}"
+
+- name: Remove MySQL test database
+  community.mysql.mysql_db:
+    name: test
+    state: absent
+    login_user: root
+    login_password: "{{ mysql_password }}"
+
+- name: Reload MySQL privilege tables
+  ansible.builtin.command:
+    cmd: "mysql -u root -p{{ mysql_password }} -e 'FLUSH PRIVILEGES;'"
+
+- name: Create OpenSupports database
+  community.mysql.mysql_db:
+    name: "{{ opensupports_db }}"
+    state: present
+    login_user: root
+    login_password: "{{ mysql_password }}"
+
+- name: Install Apache 2.4
+  ansible.builtin.yum:
+    name: httpd
+    state: present
+
+- name: Start and enable Apache service
+  ansible.builtin.service:
+    name: httpd
+    state: started
+    enabled: yes
+
+- name: Install unzip package
+  ansible.builtin.yum:
+    name: unzip
+    state: present
+
+- name: Create the OpenSupports directory
+  ansible.builtin.file:
+    path: /var/www/html/opensupports
+    state: directory
+    owner: apache
+    group: apache
+    mode: '0755'
+
+- name: Download OpenSupports
+  ansible.builtin.get_url:
+    url: https://github.com/opensupports/opensupports/releases/download/v4.11.0/opensupports_v4.11.0.zip
+    dest: /tmp/opensupports.zip
+
+- name: Unzip OpenSupports
+  ansible.builtin.unarchive:
+    src: /tmp/opensupports.zip
+    dest: /var/www/html/opensupports
+    remote_src: yes
+
+- name: Verify extraction of OpenSupports
+  ansible.builtin.stat:
+    path: /var/www/html/opensupports/index.php
+  register: opensupports_index
+
+- name: Fail if OpenSupports was not extracted correctly
+  ansible.builtin.fail:
+    msg: "OpenSupports was not extracted correctly"
+  when: not opensupports_index.stat.exists
+
+- name: Set correct permissions
+  ansible.builtin.command:
+    cmd: chown -R apache:apache /var/www/html/opensupports
+    creates: /var/www/html/opensupports
+
+- name: Modify line in /var/www/html/opensupports/api/vendor/slim/slim/Slim/Http/Util.php
+  ansible.builtin.lineinfile:
+    path: /var/www/html/opensupports/api/vendor/slim/slim/Slim/Http/Util.php
+    regexp: '^(\s*)\$strip = is_null\(\$overrideStripSlashes\) \? get_magic_quotes_gpc\(\) : \$overrideStripSlashes;$'
+    line: '        $strip = $overrideStripSlashes;'
+
+- name: Ensure mod_rewrite is enabled
+  ansible.builtin.lineinfile:
+    path: /etc/httpd/conf/httpd.conf
+    regexp: '^#?LoadModule rewrite_module modules/mod_rewrite.so'
+    line: 'LoadModule rewrite_module modules/mod_rewrite.so'
+    state: present
+
+- name: Create OpenSupports Apache configuration
+  ansible.builtin.copy:
+    dest: /etc/httpd/conf.d/opensupports.conf
+    content: |
+      <VirtualHost *:80>
+          DocumentRoot /var/www/html/opensupports
+          <Directory /var/www/html/opensupports>
+              Options Indexes FollowSymLinks
+              AllowOverride All
+              Require all granted
+          </Directory>
+          ErrorLog /var/log/httpd/opensupports-error.log
+          CustomLog /var/log/httpd/opensupports-access.log combined
+      </VirtualHost>
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Restart Apache
+  ansible.builtin.service:
+    name: httpd
+    state: restarted
+
+- name: Open HTTP port in the firewall
+  ansible.builtin.command:
+    cmd: "firewall-cmd --permanent --add-port=80/tcp"
+
+- name: Open HTTPS port in the firewall
+  ansible.builtin.command:
+    cmd: "firewall-cmd --permanent --add-port=443/tcp"
+
+- name: Reload firewall
+  ansible.builtin.command:
+    cmd: "firewall-cmd --reload"
+
+- name: Update OpenSupports configuration
+  ansible.builtin.copy:
+    dest: /var/www/html/opensupports/api/config.php
+    content: |
+      <?php
+      define('MYSQL_HOST', 'localhost');
+      define('MYSQL_USER', 'root');
+      define('MYSQL_PASSWORD', '{{ mysql_password }}');
+      define('MYSQL_DATABASE', '{{ opensupports_db }}');
+    owner: apache
+    group: apache
+    mode: '0644'
+
+- name: Check if OpenSupports website is running
+  ansible.builtin.uri:
+    url: http://localhost/opensupports/
+    return_content: yes
+  register: webpage
+
+- name: Ensure OpenSupports is running
+  debug:
+    msg: "OpenSupports is up and running. The webpage content is: {{ webpage.content }}"
+  when: "'OpenSupports' in webpage.content"
