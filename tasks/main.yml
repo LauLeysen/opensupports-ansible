@@ -235,19 +235,6 @@
   ansible.builtin.command:
     cmd: "firewall-cmd --reload"
 
-- name: Update OpenSupports configuration
-  ansible.builtin.copy:
-    dest: /var/www/html/opensupports/api/config.php
-    content: |
-      <?php
-      define('MYSQL_HOST', 'localhost');
-      define('MYSQL_USER', 'root');
-      define('MYSQL_PASSWORD', '{{ mysql_password }}');
-      define('MYSQL_DATABASE', '{{ opensupports_db }}');
-    owner: apache
-    group: apache
-    mode: '0644'
-
 - name: Check if OpenSupports website is running
   ansible.builtin.uri:
     url: http://localhost/opensupports/
