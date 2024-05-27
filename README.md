@@ -38,18 +38,7 @@ Chatgpt: help with debugging with some actions not working properly
 white page: https://github.com/opensupports/opensupports/issues/1231
 php7.4: https://idroot.us/install-php-7-4-centos-stream-9/
 RW issue api: https://stackoverflow.com/questions/29343809/php-is-writable-function-always-returns-false-for-a-writable-directory/45071223#45071223
-sudo chcon -R -t httpd_sys_rw_content_t tmp
-
-database configuration
-[root@localhost api]# chmod 666 files
-[root@localhost api]# ls
-composer.json  composer.lock  config.php  controllers  data  files  index.php  libs  models  vendor
-[root@localhost api]# rm config.php
-rm: remove regular file 'config.php'? y
-[root@localhost api]# touch config.php --> empty file
-[root@localhost api]# chmod 777 config.php
-[root@localhost api]#
 
 
-Timesheet 26july: 4;24 hours
-Timesheet 26july: 7;26 hours
+Timesheet 26june: 4;24 hours
+Timesheet 27june: 9;15 hours

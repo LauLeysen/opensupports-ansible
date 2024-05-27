@@ -130,13 +130,6 @@
   ansible.builtin.command:
     cmd: "mysql -u root -p{{ mysql_password }} -e 'FLUSH PRIVILEGES;'"
 
-- name: Create OpenSupports database
-  community.mysql.mysql_db:
-    name: "{{ opensupports_db }}"
-    state: present
-    login_user: root
-    login_password: "{{ mysql_password }}"
-
 - name: Install Apache 2.4
   ansible.builtin.yum:
     name: httpd
@@ -157,8 +150,8 @@
   ansible.builtin.file:
     path: /var/www/html/opensupports
     state: directory
-    owner: apache
-    group: apache
+    owner: root
+    group: root
     mode: '0755'
 
 - name: Download OpenSupports
@@ -234,6 +227,22 @@
 - name: Reload firewall
   ansible.builtin.command:
     cmd: "firewall-cmd --reload"
+
+- name: Update OpenSupports configuration
+  ansible.builtin.copy:
+    dest: /var/www/html/opensupports/api/config.php
+    content: ''
+    owner: root
+    group: root
+    mode: '0666'
+
+- name: Allow access /api/files directory
+  ansible.builtin.file:
+    path: /var/www/html/opensupports/api/files
+    state: directory
+    owner: root
+    group: root
+    mode: '0666'
 
 - name: Check if OpenSupports website is running
   ansible.builtin.uri:
