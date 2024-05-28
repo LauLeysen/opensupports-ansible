@@ -1,5 +1,5 @@
 # Variables for the playbook
 ---
-opensupports_ip: 192.168.127.157
-opensupports_target_user: root
-mysql_password: SuperHardP@ssword123
+opensupports_ip: xxx.xxx.xxx.xxx #your target host ip
+opensupports_target_user: root # target user
+mysql_password: SuperHardP@ssword12 # password you want to set for the database
