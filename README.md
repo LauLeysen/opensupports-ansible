@@ -42,3 +42,4 @@ RW issue api: https://stackoverflow.com/questions/29343809/php-is-writable-funct
 
 Timesheet 26june: 4;24 hours
 Timesheet 27june: 9;15 hours
+Timesheet 28june: 2;23 hours
