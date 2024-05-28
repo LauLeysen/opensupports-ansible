@@ -1,0 +1,120 @@
+- name: Start and enable Apache service
+  ansible.builtin.service:
+    name: httpd
+    state: started
+    enabled: yes
+
+- name: Create the OpenSupports directory
+  ansible.builtin.file:
+    path: /var/www/html/opensupports
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Download OpenSupports
+  ansible.builtin.get_url:
+    url: https://github.com/opensupports/opensupports/releases/download/v4.11.0/opensupports_v4.11.0.zip
+    dest: /tmp/opensupports.zip
+
+- name: Unzip OpenSupports
+  ansible.builtin.unarchive:
+    src: /tmp/opensupports.zip
+    dest: /var/www/html/opensupports
+    remote_src: yes
+
+- name: Verify extraction of OpenSupports
+  ansible.builtin.stat:
+    path: /var/www/html/opensupports/index.php
+  register: opensupports_index
+
+- name: Fail if OpenSupports was not extracted correctly
+  ansible.builtin.fail:
+    msg: "OpenSupports was not extracted correctly"
+  when: not opensupports_index.stat.exists
+
+- name: Set correct permissions
+  ansible.builtin.command:
+    cmd: chown -R apache:apache /var/www/html/opensupports
+    creates: /var/www/html/opensupports
+
+- name: Modify line in /var/www/html/opensupports/api/vendor/slim/slim/Slim/Http/Util.php
+  ansible.builtin.lineinfile:
+    path: /var/www/html/opensupports/api/vendor/slim/slim/Slim/Http/Util.php
+    regexp: '^(\s*)\$strip = is_null\(\$overrideStripSlashes\) \? get_magic_quotes_gpc\(\) : \$overrideStripSlashes;$'
+    line: '        $strip = $overrideStripSlashes;'
+
+- name: Create OpenSupports Apache configuration
+  ansible.builtin.copy:
+    dest: /etc/httpd/conf.d/opensupports.conf
+    content: |
+      <VirtualHost *:80>
+          DocumentRoot /var/www/html/opensupports
+          <Directory /var/www/html/opensupports>
+              Options Indexes FollowSymLinks
+              AllowOverride All
+              Require all granted
+          </Directory>
+          ErrorLog /var/log/httpd/opensupports-error.log
+          CustomLog /var/log/httpd/opensupports-access.log combined
+      </VirtualHost>
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Restart Apache
+  ansible.builtin.service:
+    name: httpd
+    state: restarted
+
+- name: Open HTTP port in the firewall
+  ansible.builtin.command:
+    cmd: "firewall-cmd --permanent --add-port=80/tcp"
+
+- name: Open HTTPS port in the firewall
+  ansible.builtin.command:
+    cmd: "firewall-cmd --permanent --add-port=443/tcp"
+
+- name: Reload firewall
+  ansible.builtin.command:
+    cmd: "firewall-cmd --reload"
+
+- name: Update OpenSupports configuration
+  ansible.builtin.copy:
+    dest: /var/www/html/opensupports/api/config.php
+    content: ''
+    owner: root
+    group: root
+    mode: '0666'
+
+- name: Allow access to /api/files directory
+  ansible.builtin.file:
+    path: /var/www/html/opensupports/api/files
+    state: directory
+    owner: root
+    group: root
+    mode: '0666'
+
+- name: Allow access to Serializer directory
+  ansible.builtin.file:
+    path: /var/www/html/opensupports/api/vendor/ezyang/htmlpurifier/library/HTMLPurifier/DefinitionCache/Serializer
+    state: directory
+    owner: root
+    group: root
+    mode: '0557'
+
+#otherwise blocking read write to api/files etc
+- name: Set SELinux to permissive mode
+  ansible.builtin.command:
+    cmd: setenforce Permissive
+
+- name: Check if OpenSupports website is running
+  ansible.builtin.uri:
+    url: http://localhost/opensupports/
+    return_content: yes
+  register: webpage
+
+- name: Ensure OpenSupports is running
+  debug:
+    msg: "OpenSupports is up and running. The webpage content is: {{ webpage.content }}"
+  when: "'OpenSupports' in webpage.content"

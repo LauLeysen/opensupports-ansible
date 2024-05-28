@@ -1,0 +1,54 @@
+- name: Ensure the system is up to date
+  ansible.builtin.yum:
+    name: "*"
+    state: latest
+
+- name: Import Remi2021 GPG key
+  ansible.builtin.rpm_key:
+    key: https://rpms.remirepo.net/RPM-GPG-KEY-remi2021
+    state: present
+
+- name: Add MySQL Yum repository for Rocky 9
+  ansible.builtin.yum_repository:
+    name: mysql80-community
+    description: MySQL 8.0 Community Server
+    baseurl: http://repo.mysql.com/yum/mysql-8.0-community/el/9/$basearch/
+    gpgcheck: yes
+    gpgkey: https://repo.mysql.com/RPM-GPG-KEY-mysql-2023
+    enabled: yes
+
+- name: Remove any existing PHP versions
+  ansible.builtin.yum:
+    name: "php*"
+    state: absent
+
+- name: Install required packages
+  ansible.builtin.yum:
+    name:
+      - python3
+      - python3-PyMySQL
+      - epel-release
+      - httpd
+      - unzip
+      - mysql
+      - mysql-server
+      - mod_ssl
+      - https://rpms.remirepo.net/enterprise/remi-release-9.rpm
+    state: present
+
+- name: Enable PHP 7.4 module
+  ansible.builtin.command:
+    cmd: dnf module enable php:remi-7.4 -y
+
+- name: Install PHP 7.4 and required extensions
+  ansible.builtin.yum:
+    name:
+      - php
+      - php-cli
+      - php-fpm
+      - php-json
+      - php-mysqlnd
+      - php-pdo
+      - php-xml
+      - php-mbstring
+    state: present

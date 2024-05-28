@@ -1,0 +1,51 @@
+- name: Start and enable MySQL service
+  ansible.builtin.service:
+    name: mysqld
+    state: started
+    enabled: yes
+
+- name: Add skip-grant-tables to MySQL config
+  ansible.builtin.blockinfile:
+    path: /etc/my.cnf
+    block: |
+      skip-grant-tables
+
+- name: Restart MySQL service to apply skip-grant-tables
+  ansible.builtin.service:
+    name: mysqld
+    state: restarted
+
+- name: Flush privileges and set MySQL root password
+  ansible.builtin.command:
+    cmd: "mysql -u root -e \"FLUSH PRIVILEGES; ALTER USER 'root'@'localhost' IDENTIFIED BY '{{ mysql_password }}';\""
+
+- name: Remove skip-grant-tables from MySQL config
+  ansible.builtin.replace:
+    path: /etc/my.cnf
+    regexp: '^\s*skip-grant-tables\s*$'
+    replace: ''
+    backup: yes
+
+- name: Restart MySQL service to remove skip-grant-tables
+  ansible.builtin.service:
+    name: mysqld
+    state: restarted
+
+- name: Remove anonymous MySQL users
+  community.mysql.mysql_user:
+    name: ''
+    host_all: yes
+    state: absent
+    login_user: root
+    login_password: "{{ mysql_password }}"
+
+- name: Remove MySQL test database
+  community.mysql.mysql_db:
+    name: test
+    state: absent
+    login_user: root
+    login_password: "{{ mysql_password }}"
+
+- name: Reload MySQL privilege tables
+  ansible.builtin.command:
+    cmd: "mysql -u root -p{{ mysql_password }} -e 'FLUSH PRIVILEGES;'"
