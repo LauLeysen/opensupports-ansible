@@ -7,6 +7,8 @@ This repository contains an Ansible playbook for setting up OpenSupports on a ta
 - MySQL 4.1+
 - PDO driver
 
+Also note the database only works over https connection so the SSL is REALLY necessary and you have to use https://
+
 ## Prerequisites
 
 Ensure you have the following installed on your control machine:
@@ -32,6 +34,14 @@ You can easily send your SSH key from the host to the target host with the follo
 
 ```sh
 cat ~/.ssh/id_rsa.pub | ssh root@xxx.xxx.xxx.xxx 'mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys'
+```
+
+## Run the playbook
+
+All you need to do is run this command in the directory!
+
+```bash
+ansible-playbook main.yml
 ```
 
 ## Project Timesheet
