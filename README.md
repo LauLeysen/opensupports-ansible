@@ -15,6 +15,8 @@ Ensure you have the following installed on your control machine:
 
 - Ansible
 - SSH access to the target host
+- Email setup with smtp I used outlook
+    - smtp.office365.com:587
 
 ## Variables
 
